@@ -1,49 +1,75 @@
-import { createAsyncThunk, createSlice } from '@reduxjs/toolkit'
-import { fetchData } from './directotyAPI'
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { fetchData } from "./directotyAPI";
 
 const initialState = {
-  content: {},
+  content: [],
   loading: false,
+};
+
+export const selectDirectorys = (state) => state.directorys;
+
+function updateTreeData(list, key, children) {
+  return list.map((node) => {
+    if (node.key === key) {
+      return { ...node, children };
+    }
+
+    if (node.children) {
+      return {
+        ...node,
+        children: updateTreeData(node.children, key, children),
+      };
+    }
+
+    return node;
+  });
 }
 
-export const selectDirectorys = (state) => state.directorys
+function transformData(data) {
+  let newData = [];
+  data.map((val) => {
+    if (val.children !== undefined) {
+      newData.push({
+        title: val.title,
+        key: val.id,
+        children: [],
+      });
+    } else {
+      newData.push({
+        title: val.title,
+        key: val.id,
+        isLeaf: true,
+      });
+    }
+  });
+
+  return newData;
+}
 
 export const fetchDataAsync = createAsyncThunk(
-  'directory/fetchData',
-  async (dirId, { dispatch, getState }) => {
-    const res = await fetchData(dirId)
-    const curValue = selectDirectorys(getState())
-    console.log('async', curValue)
-    return res
-  }
-)
+  "directory/fetchData",
+  async (dirId, { getState }) => {
+    const res = await fetchData(dirId);
+    if (dirId === undefined) return transformData(res.children);
+    const curValue = selectDirectorys(getState());
 
-// export const postFetch = (dirId, res) => (dispatch, getState) => {
-//   const curValue = selectDirectorys(getState())
-//   console.log('prevfetch', curValue, res)
-
-//   return res
-// }
+    return updateTreeData(curValue.content, dirId, transformData(res.children));
+  },
+);
 
 export const directotySlice = createSlice({
-  name: 'directoty',
+  name: "directoty",
   initialState,
-  // reducers: {
-  //   postFetch: (state, action) => {
-  //     console.log('reducer', action.payload)
-  //     state.content = action.payload
-  //   },
-  // },
   extraReducers: (builder) => {
     builder
       .addCase(fetchDataAsync.pending, (state) => {
-        state.loading = true
+        state.loading = true;
       })
       .addCase(fetchDataAsync.fulfilled, (state, action) => {
-        state.loading = false
-        state.content = action.payload
-      })
+        state.loading = false;
+        state.content = action.payload;
+      });
   },
-})
+});
 
-export default directotySlice.reducer
+export default directotySlice.reducer;
